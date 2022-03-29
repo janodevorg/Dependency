@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "DependencyStatic", type: .static, targets: ["Dependency"])
     ],
     dependencies: [
-        .package(url: "git@github.com:apple/swift-docc-plugin.git", branch: "main"),
+        .package(url: "git@github.com:apple/swift-docc-plugin.git", from: "1.0.0")
     ],
     targets: [
         .target(
