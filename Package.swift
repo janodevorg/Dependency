@@ -1,14 +1,17 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.7
 import PackageDescription
 
 let package = Package(
     name: "Dependency",
     platforms: [
-        .iOS(.v15)
+        .iOS(.v14), 
+        .macCatalyst(.v14), 
+        .macOS(.v12),
+        .tvOS(.v14)
     ],
     products: [
-        .library(name: "Dependency", type: .dynamic, targets: ["Dependency"]),
-        .library(name: "DependencyStatic", type: .static, targets: ["Dependency"])
+        .library(name: "Dependency", type: .static, targets: ["Dependency"]),
+        .library(name: "DependencyDynamic", type: .dynamic, targets: ["Dependency"])
     ],
     dependencies: [
         .package(url: "git@github.com:apple/swift-docc-plugin.git", from: "1.0.0")
