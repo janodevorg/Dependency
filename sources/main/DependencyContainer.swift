@@ -95,7 +95,10 @@ public final class DependencyContainer: CustomDebugStringConvertible
             return factory.create(DependencyContainer.shared)
         }
         guard let dependency = shared.dependencies[key] as? T else {
-            preconditionFailure("No dependency found for key \(key).")
+            if shared.dependencies.keys.contains(key) {
+                preconditionFailure("Key found with type \(type(of: shared.dependencies[key])) but client expected \(T.self)")
+            }
+            preconditionFailure("No dependency found for key \(key). The keys I know are: \(shared.dependencies.keys)")
         }
         return dependency
     }
