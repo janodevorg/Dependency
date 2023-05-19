@@ -4,14 +4,13 @@ import PackageDescription
 let package = Package(
     name: "Dependency",
     platforms: [
-        .iOS(.v14), 
-        .macCatalyst(.v14), 
-        .macOS(.v12),
-        .tvOS(.v14)
+        .iOS(.v16), 
+        .macCatalyst(.v16),
+        .macOS(.v13),
+        .tvOS(.v16)
     ],
     products: [
-        .library(name: "Dependency", type: .static, targets: ["Dependency"]),
-        .library(name: "DependencyDynamic", type: .dynamic, targets: ["Dependency"])
+        .library(name: "Dependency", targets: ["Dependency"])
     ],
     dependencies: [
         .package(url: "git@github.com:apple/swift-docc-plugin.git", from: "1.0.0")
