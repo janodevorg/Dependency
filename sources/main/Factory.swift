@@ -11,6 +11,7 @@
 public struct Factory<T>: CustomDebugStringConvertible {
 
     /// Creates a new instance.
+    /// Having the container as parameter let us query other instances.
     public let create: (DependencyContainer) -> T
 
     /// Initializes an instance configured instances of type `T`.

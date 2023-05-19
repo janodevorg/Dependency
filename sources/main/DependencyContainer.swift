@@ -1,4 +1,27 @@
 import os
+import Foundation
+
+public enum Environment: String, Equatable {
+    case live
+    case preview
+    case test
+    
+    public init() {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            self = .preview
+            return
+        }
+        
+        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let isRunningUITests = ProcessInfo().arguments.contains("UI_TEST")
+        if isRunningTests && isRunningUITests {
+            self = .test
+            return
+        }
+        
+        self = .live
+    }
+}
 
 /**
  Dependency container.
@@ -17,8 +40,9 @@ public final class DependencyContainer: CustomDebugStringConvertible
     private static let log = Logger(subsystem: "dev.jano", category: "injection")
 
     // Key to register a type with.
-    private static func keyForType<T>(_ type: T.Type) -> String {
+    private static func keyForType<T>(_ type: T.Type, environment: Environment) -> String {
         let typeDescription = String(describing: T.self)
+        let suffix = "-\(environment.rawValue)"
         /*
          This relies on the following for Optional detection:
          https://developer.apple.com/documentation/swift/expressiblebynilliteral
@@ -31,9 +55,9 @@ public final class DependencyContainer: CustomDebugStringConvertible
         {
             // remove the wrapping "Optional<>" so key is just the type,
             // same as if we had registered a non optional type
-            return String(typeDescription.dropFirst("Optional<".count).dropLast())
+            return String(typeDescription.dropFirst("Optional<".count).dropLast()) + suffix
         } else {
-            return typeDescription
+            return typeDescription + suffix
         }
     }
 
@@ -44,8 +68,8 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter dependency: dependency whose registration is being queried.
      - Returns: true if the dependency is registered.
      */
-    public static func isRegistered<T>(_ dependency: T.Type) -> Bool {
-        let key = keyForType(T.self)
+    public static func isRegistered<T>(_ dependency: T.Type, environment: Environment = Environment()) -> Bool {
+        let key = keyForType(T.self, environment: environment)
         return shared.dependencies[key] != nil
     }
 
@@ -58,8 +82,8 @@ public final class DependencyContainer: CustomDebugStringConvertible
      dependencies.
      - Parameter factory: An object that creates a new instance of type `T`.
     */
-    public static func register<T>(factory: Factory<T>) {
-        let key = keyForType(factory.typeCreated.self)
+    public static func register<T>(factory: Factory<T>, environment: Environment = Environment()) {
+        let key = keyForType(factory.typeCreated.self, environment: environment)
         shared.dependencies[key] = factory as AnyObject
     }
 
@@ -68,8 +92,8 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
      If the instance is a reference type it will be treated as a singleton.
      */
-    public static func register<T>(_ dependency: T) {
-        let key = keyForType(T.self)
+    public static func register<T>(_ dependency: T, environment: Environment = Environment()) {
+        let key = keyForType(T.self, environment: environment)
         shared.dependencies[key] = dependency as AnyObject
         log.trace("Registered \(key): \(String(describing: dependency))")
     }
@@ -89,16 +113,19 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
      - Returns: resolved instance.
      */
-    public static func resolve<T>() -> T {
-        let key = keyForType(T.self)
+    public static func resolve<T>(_ environment: Environment = Environment()) -> T {
+        let key = keyForType(T.self, environment: environment)
+        
+        // the type registered is actually a factory that produces an instance for that type 
         if let factory = shared.dependencies[key] as? Factory<T> {
             return factory.create(DependencyContainer.shared)
         }
+        
         guard let dependency = shared.dependencies[key] as? T else {
             if shared.dependencies.keys.contains(key) {
-                preconditionFailure("Key found with type \(type(of: shared.dependencies[key])) but client expected \(T.self)")
+                preconditionFailure("Wrong type: Key found with type \(type(of: shared.dependencies[key])) but client expected \(T.self)")
             }
-            preconditionFailure("No dependency found for key \(key). The keys I know are: \(shared.dependencies.keys)")
+            preconditionFailure("Missing dependency: No dependency found for key \(key). The keys I know are: \(shared.dependencies.keys)")
         }
         return dependency
     }
