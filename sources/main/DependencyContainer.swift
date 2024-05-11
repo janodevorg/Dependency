@@ -36,7 +36,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
     // Private storage for dependencies.
     private var dependencies = [String: AnyObject]()
-    private let lock = NSLock()
+    private static let queue = DispatchQueue(label: "thread.DependencyContainer", attributes: .concurrent)
 
     // Shared container instance
     private static let shared = DependencyContainer()
@@ -44,17 +44,16 @@ public final class DependencyContainer: CustomDebugStringConvertible
     // Logger instance.
     private static var log = Logger(subsystem: "Dependency", category: "DependencyContainer")
     private static var isConfigured = false
-    private static let configLock = NSLock()
 
     public func configureLogger(subsystem: String, category: String) {
-        Self.configLock.lock()
-        defer { Self.configLock.unlock() }
-        guard !Self.isConfigured else {
-            Self.log.debug("Ignored call. Logger can only be configured once.")
-            return
+        DependencyContainer.queue.async(flags: .barrier) {
+            guard !Self.isConfigured else {
+                Self.log.debug("Ignored call. Logger can only be configured once.")
+                return
+            }
+            Self.log = Logger(subsystem: subsystem, category: category)
+            Self.isConfigured = true
         }
-        Self.log = Logger(subsystem: subsystem, category: category)
-        Self.isConfigured = true
     }
 
     // Key to register a type with.
@@ -87,11 +86,11 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter environment: environment where registration happens.
      - Returns: true if the dependency is registered.
      */
-    public static func isRegistered<T>(_ dependency: T.Type, environment: Environment = Environment()) -> Bool {
-        let key = keyForType(T.self, environment: environment)
-        shared.lock.lock()
-        defer { shared.lock.unlock() }
-        return shared.dependencies[key] != nil
+    public static func isRegistered<T>(_ dependency: T.Type, key: String? = nil, environment: Environment = Environment()) -> Bool {
+        DependencyContainer.queue.sync {
+            let key = key ?? keyForType(T.self, environment: environment)
+            return shared.dependencies[key] != nil
+        }
     }
 
     // MARK: - Registering types
@@ -104,11 +103,11 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter factory: An object that creates a new instance of type `T`.
      - Parameter environment: environment where registration happens.
     */
-    public static func register<T>(factory: Factory<T>, environment: Environment = Environment()) {
-        let key = keyForType(factory.typeCreated.self, environment: environment)
-        shared.lock.lock()
-        shared.dependencies[key] = factory as AnyObject
-        shared.lock.unlock()
+    public static func register<T>(factory: Factory<T>, key: String? = nil, environment: Environment = Environment()) {
+        DependencyContainer.queue.async(flags: .barrier) {
+            let key = key ?? keyForType(factory.typeCreated.self, environment: environment)
+            shared.dependencies[key] = factory as AnyObject
+        }
     }
 
     /**
@@ -119,19 +118,19 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter dependency: instance being registered.
      - Parameter environment: environment where registration happens.
      */
-    public static func register<T>(_ dependency: T, environment: Environment = Environment()) {
-        let key = keyForType(T.self, environment: environment)
-        shared.lock.lock()
-        shared.dependencies[key] = dependency as AnyObject
-        log.trace("Registered \(key): \(String(describing: dependency))")
-        shared.lock.unlock()
+    public static func register<T>(_ dependency: T, key: String? = nil, environment: Environment = Environment()) {
+        DependencyContainer.queue.async(flags: .barrier) {
+            let key = key ?? keyForType(T.self, environment: environment)
+            shared.dependencies[key] = dependency as AnyObject
+            log.trace("Registered \(key): \(String(describing: dependency))")
+        }
     }
 
     /// Unregisters all dependencies
     public static func unregisterAll() {
-        shared.lock.lock()
-        shared.dependencies = [String: AnyObject]()
-        shared.lock.unlock()
+        DependencyContainer.queue.async(flags: .barrier) {
+            shared.dependencies = [String: AnyObject]()
+        }
     }
 
     // MARK: - Resolving a type
@@ -144,23 +143,23 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
      - Returns: resolved instance.
      */
-    public static func resolve<T>(_ environment: Environment = Environment()) -> T {
-        let key = keyForType(T.self, environment: environment)
-        shared.lock.lock()
-        defer { shared.lock.unlock() }
+    public static func resolve<T>(key: String? = nil, _ environment: Environment = Environment()) -> T {
+        DependencyContainer.queue.sync {
+            let key = key ?? keyForType(T.self, environment: environment)
 
-        // the type registered is actually a factory that produces an instance for that type
-        if let factory = shared.dependencies[key] as? Factory<T> {
-            return factory.create(DependencyContainer.shared)
-        }
-        
-        guard let dependency = shared.dependencies[key] as? T else {
-            if shared.dependencies.keys.contains(key) {
-                preconditionFailure("Wrong type: Key found with type \(type(of: shared.dependencies[key])) but client expected \(T.self)")
+            // the type registered is actually a factory that produces an instance for that type
+            if let factory = shared.dependencies[key] as? Factory<T> {
+                return factory.create(DependencyContainer.shared)
             }
-            preconditionFailure("Missing dependency: No dependency found for key \(key). The keys I know are: \(shared.dependencies.keys)")
+
+            guard let dependency = shared.dependencies[key] as? T else {
+                if shared.dependencies.keys.contains(key) {
+                    preconditionFailure("Wrong type: Key found with type \(type(of: shared.dependencies[key])) but client expected \(T.self)")
+                }
+                preconditionFailure("Missing dependency: No dependency found for key \(key). The keys I know are: \(shared.dependencies.keys)")
+            }
+            return dependency
         }
-        return dependency
     }
     
     // MARK: - Debugging
@@ -172,12 +171,12 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
     /// A textual description of the instances registered, suitable for debugging.
     public var debugDescription: String {
-        lock.lock()
-        defer { lock.unlock() }
-        return """
-        Container registered \(dependencies.count) dependencies:
-        \t\(dependencies.keys.sorted().joined(separator: "\n\t"))
-        """
+        DependencyContainer.queue.sync {
+            """
+            Container registered \(dependencies.count) dependencies:
+            \t\(dependencies.keys.sorted().joined(separator: "\n\t"))
+            """
+        }
     }
 }
 

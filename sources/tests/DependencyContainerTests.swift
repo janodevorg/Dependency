@@ -18,6 +18,18 @@ final class DependencyContainerTests: XCTestCase
         XCTAssertTrue(DependencyContainer.isRegistered(HomeCoordinating.self))
     }
 
+    func testIsRegisteredWithCustomKey() {
+        let key = "xyz"
+
+        // Test registering a struct
+        DependencyContainer.register(HomeCoordinator(), key: key)
+        XCTAssertTrue(DependencyContainer.isRegistered(HomeCoordinator.self, key: key))
+
+        // Test registering a protocol
+        DependencyContainer.register(HomeCoordinator() as HomeCoordinating, key: key)
+        XCTAssertTrue(DependencyContainer.isRegistered(HomeCoordinating.self, key: key))
+    }
+
     // A struct registered with a factory is resolved.
     func testInjectedFactory()
     {
