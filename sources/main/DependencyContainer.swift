@@ -45,7 +45,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
     private static var log = Logger(subsystem: "Dependency", category: "DependencyContainer")
     private static var isConfigured = false
 
-    public func configureLogger(subsystem: String, category: String) {
+    public static func configureLogger(subsystem: String, category: String) {
         DependencyContainer.queue.async(flags: .barrier) {
             guard !Self.isConfigured else {
                 Self.log.debug("Ignored call. Logger can only be configured once.")
