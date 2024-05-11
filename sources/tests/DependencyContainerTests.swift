@@ -91,7 +91,7 @@ final class DependencyContainerTests: XCTestCase
     }
 }
 
-// MARK: - Test objects
+// MARK: - Test objects (Private)
 
 // MARK: Mocking a protocol
 

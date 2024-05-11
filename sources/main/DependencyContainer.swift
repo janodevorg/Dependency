@@ -6,6 +6,10 @@ public enum Environment: String, Equatable {
     case preview
     case test
     
+    /// Creates an instance for the environment, which is
+    /// - .preview for SwiftUI previews
+    /// - .test during unit testing
+    /// - .live otherwise
     public init() {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
             self = .preview
@@ -14,7 +18,7 @@ public enum Environment: String, Equatable {
         
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         let isRunningUITests = ProcessInfo().arguments.contains("UI_TEST")
-        if isRunningTests && isRunningUITests {
+        if isRunningTests || isRunningUITests {
             self = .test
             return
         }
@@ -32,17 +36,31 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
     // Private storage for dependencies.
     private var dependencies = [String: AnyObject]()
+    private let lock = NSLock()
 
     // Shared container instance
     private static let shared = DependencyContainer()
 
     // Logger instance.
-    private static let log = Logger(subsystem: "dev.jano", category: "injection")
+    private static var log = Logger(subsystem: "Dependency", category: "DependencyContainer")
+    private static var isConfigured = false
+    private static let configLock = NSLock()
+
+    public func configureLogger(subsystem: String, category: String) {
+        Self.configLock.lock()
+        defer { Self.configLock.unlock() }
+        guard !Self.isConfigured else {
+            Self.log.debug("Ignored call. Logger can only be configured once.")
+            return
+        }
+        Self.log = Logger(subsystem: subsystem, category: category)
+        Self.isConfigured = true
+    }
 
     // Key to register a type with.
     private static func keyForType<T>(_ type: T.Type, environment: Environment) -> String {
         let typeDescription = String(describing: T.self)
-        let suffix = "-\(environment.rawValue)"
+        let preffix = environment.rawValue
         /*
          This relies on the following for Optional detection:
          https://developer.apple.com/documentation/swift/expressiblebynilliteral
@@ -55,9 +73,9 @@ public final class DependencyContainer: CustomDebugStringConvertible
         {
             // remove the wrapping "Optional<>" so key is just the type,
             // same as if we had registered a non optional type
-            return String(typeDescription.dropFirst("Optional<".count).dropLast()) + suffix
+            return "\(preffix)." + String(typeDescription.dropFirst("Optional<".count).dropLast())
         } else {
-            return typeDescription + suffix
+            return "\(preffix)." + typeDescription
         }
     }
 
@@ -66,10 +84,13 @@ public final class DependencyContainer: CustomDebugStringConvertible
     /**
      Returns true if the given type is registered.
      - Parameter dependency: dependency whose registration is being queried.
+     - Parameter environment: environment where registration happens.
      - Returns: true if the dependency is registered.
      */
     public static func isRegistered<T>(_ dependency: T.Type, environment: Environment = Environment()) -> Bool {
         let key = keyForType(T.self, environment: environment)
+        shared.lock.lock()
+        defer { shared.lock.unlock() }
         return shared.dependencies[key] != nil
     }
 
@@ -81,26 +102,36 @@ public final class DependencyContainer: CustomDebugStringConvertible
      Use it to create an intance per request or to create an instance that uses additional
      dependencies.
      - Parameter factory: An object that creates a new instance of type `T`.
+     - Parameter environment: environment where registration happens.
     */
     public static func register<T>(factory: Factory<T>, environment: Environment = Environment()) {
         let key = keyForType(factory.typeCreated.self, environment: environment)
+        shared.lock.lock()
         shared.dependencies[key] = factory as AnyObject
+        shared.lock.unlock()
     }
 
     /**
      Register an instance.
 
      If the instance is a reference type it will be treated as a singleton.
+
+     - Parameter dependency: instance being registered.
+     - Parameter environment: environment where registration happens.
      */
     public static func register<T>(_ dependency: T, environment: Environment = Environment()) {
         let key = keyForType(T.self, environment: environment)
+        shared.lock.lock()
         shared.dependencies[key] = dependency as AnyObject
         log.trace("Registered \(key): \(String(describing: dependency))")
+        shared.lock.unlock()
     }
 
     /// Unregisters all dependencies
     public static func unregisterAll() {
+        shared.lock.lock()
         shared.dependencies = [String: AnyObject]()
+        shared.lock.unlock()
     }
 
     // MARK: - Resolving a type
@@ -115,8 +146,10 @@ public final class DependencyContainer: CustomDebugStringConvertible
      */
     public static func resolve<T>(_ environment: Environment = Environment()) -> T {
         let key = keyForType(T.self, environment: environment)
-        
-        // the type registered is actually a factory that produces an instance for that type 
+        shared.lock.lock()
+        defer { shared.lock.unlock() }
+
+        // the type registered is actually a factory that produces an instance for that type
         if let factory = shared.dependencies[key] as? Factory<T> {
             return factory.create(DependencyContainer.shared)
         }
@@ -139,7 +172,9 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
     /// A textual description of the instances registered, suitable for debugging.
     public var debugDescription: String {
-        """
+        lock.lock()
+        defer { lock.unlock() }
+        return """
         Container registered \(dependencies.count) dependencies:
         \t\(dependencies.keys.sorted().joined(separator: "\n\t"))
         """
@@ -152,6 +187,6 @@ private protocol OptionalProtocol {
 
 extension Optional: OptionalProtocol {
     func wrappedType() -> Any.Type {
-        return Wrapped.self
+        Wrapped.self
     }
 }
