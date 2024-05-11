@@ -23,8 +23,12 @@ DependencyContainer.register(factory: factory)
 ### Resolving
 
 ```swift
-// resolving manually
+// resolving manually, crashes if instance is not registered
 let log = DependencyContainer.resolve() as Logger
+let log: Logger = DependencyContainer.resolve()
+
+// when resolving as optional, no crash happens if instance is not registered
+let log: Logger? = DependencyContainer.resolve()
 
 final class ObjectWithProtocolDependency {
     
@@ -36,6 +40,16 @@ final class ObjectWithProtocolDependency {
     }
 }
 ```
+
+### Register for environment
+
+Instances are registered for live, preview, test, depending on the environment.
+You can also register or resolve for a specific environment.
+```swift
+DependencyContainer.register(SomeObject(), environment: .test)
+DependencyContainer.resolve(environment: .test) as SomeObject
+```
+
 
 ## Topics
 
