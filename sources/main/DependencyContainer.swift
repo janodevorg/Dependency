@@ -122,7 +122,6 @@ public final class DependencyContainer: CustomDebugStringConvertible
         DependencyContainer.queue.async(flags: .barrier) {
             let key = key ?? keyForType(T.self, environment: environment)
             shared.dependencies[key] = dependency as AnyObject
-            log.trace("Registered \(key): \(String(describing: dependency))")
         }
     }
 
