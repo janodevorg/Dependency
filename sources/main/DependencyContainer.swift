@@ -1,37 +1,37 @@
 import os
 import Foundation
 
-public enum Environment: String, Equatable {
-    case live
-    case preview
-    case test
-    
-    /// Creates an instance for the environment, which is
-    /// - .preview for SwiftUI previews
-    /// - .test during unit testing
-    /// - .live otherwise
-    public init() {
-        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
-            self = .preview
-            return
-        }
-        
-        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        let isRunningUITests = ProcessInfo().arguments.contains("UI_TEST")
-        if isRunningTests || isRunningUITests {
-            self = .test
-            return
-        }
-        
-        self = .live
-    }
-}
-
 /**
  Dependency container.
  */
 public final class DependencyContainer: CustomDebugStringConvertible
 {
+    public enum RuntimeEnvironment: String, Equatable {
+        case live
+        case preview
+        case test
+
+        /// Creates an instance for the environment, which is
+        /// - .preview for SwiftUI previews
+        /// - .test during unit testing
+        /// - .live otherwise
+        public init() {
+            if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+                self = .preview
+                return
+            }
+
+            let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            let isRunningUITests = ProcessInfo().arguments.contains("UI_TEST")
+            if isRunningTests || isRunningUITests {
+                self = .test
+                return
+            }
+
+            self = .live
+        }
+    }
+    
     // MARK: - Private
 
     // Private storage for dependencies.
@@ -57,7 +57,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
     }
 
     // Key to register a type with.
-    private static func keyForType<T>(_ type: T.Type, environment: Environment) -> String {
+    private static func keyForType<T>(_ type: T.Type, environment: RuntimeEnvironment) -> String {
         let typeDescription = String(describing: T.self)
         let preffix = environment.rawValue
         /*
@@ -86,7 +86,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter environment: environment where registration happens.
      - Returns: true if the dependency is registered.
      */
-    public static func isRegistered<T>(_ dependency: T.Type, key: String? = nil, environment: Environment = Environment()) -> Bool {
+    public static func isRegistered<T>(_ dependency: T.Type, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) -> Bool {
         DependencyContainer.queue.sync {
             let key = key ?? keyForType(T.self, environment: environment)
             return shared.dependencies[key] != nil
@@ -103,7 +103,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter factory: An object that creates a new instance of type `T`.
      - Parameter environment: environment where registration happens.
     */
-    public static func register<T>(factory: Factory<T>, key: String? = nil, environment: Environment = Environment()) {
+    public static func register<T>(factory: Factory<T>, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) {
         DependencyContainer.queue.async(flags: .barrier) {
             let key = key ?? keyForType(factory.typeCreated.self, environment: environment)
             shared.dependencies[key] = factory as AnyObject
@@ -118,7 +118,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter dependency: instance being registered.
      - Parameter environment: environment where registration happens.
      */
-    public static func register<T>(_ dependency: T, key: String? = nil, environment: Environment = Environment()) {
+    public static func register<T>(_ dependency: T, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) {
         DependencyContainer.queue.async(flags: .barrier) {
             let key = key ?? keyForType(T.self, environment: environment)
             shared.dependencies[key] = dependency as AnyObject
@@ -143,7 +143,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
      - Returns: resolved instance.
      */
-    public static func resolve<T>(key: String? = nil, _ environment: Environment = Environment()) -> T {
+    public static func resolve<T>(key: String? = nil, _ environment: RuntimeEnvironment = RuntimeEnvironment()) -> T {
         DependencyContainer.queue.sync {
             let key = key ?? keyForType(T.self, environment: environment)
 

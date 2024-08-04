@@ -8,22 +8,22 @@ final class EnvironmentTests: XCTestCase {
     }
 
     func testRegistrationForEnvironment() {
-        let live = Environment.live.rawValue
-        let preview = Environment.preview.rawValue
-        let test = Environment.test.rawValue
+        let live = DependencyContainer.RuntimeEnvironment.live.rawValue
+        let preview = DependencyContainer.RuntimeEnvironment.preview.rawValue
+        let test = DependencyContainer.RuntimeEnvironment.test.rawValue
 
         DependencyContainer.register(live, environment: .live)
         DependencyContainer.register(preview, environment: .preview)
         DependencyContainer.register(test, environment: .test)
 
-        XCTAssertEqual(Environment.live.rawValue, DependencyContainer.resolve(.live))
-        XCTAssertEqual(Environment.preview.rawValue, DependencyContainer.resolve(.preview))
-        XCTAssertEqual(Environment.test.rawValue, DependencyContainer.resolve(.test))
+        XCTAssertEqual(DependencyContainer.RuntimeEnvironment.live.rawValue, DependencyContainer.resolve(.live))
+        XCTAssertEqual(DependencyContainer.RuntimeEnvironment.preview.rawValue, DependencyContainer.resolve(.preview))
+        XCTAssertEqual(DependencyContainer.RuntimeEnvironment.test.rawValue, DependencyContainer.resolve(.test))
     }
 
     func testDefaultRegistrationForTesting() {
-        let object = Environment.test.rawValue
+        let object = DependencyContainer.RuntimeEnvironment.test.rawValue
         DependencyContainer.register(object)
-        XCTAssertEqual(Environment.test.rawValue, DependencyContainer.resolve(.test) as String)
+        XCTAssertEqual(DependencyContainer.RuntimeEnvironment.test.rawValue, DependencyContainer.resolve(.test) as String)
     }
 }

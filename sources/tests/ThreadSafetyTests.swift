@@ -22,7 +22,7 @@ final class ThreadSafetyTests: XCTestCase
                 }
 
                 DependencyContainer.register(factory: factory, key: "\(i)", environment: .test)
-                let resolved: Int = DependencyContainer.resolve(key: "\(i)", Environment.test)
+                let resolved: Int = DependencyContainer.resolve(key: "\(i)", DependencyContainer.RuntimeEnvironment.test)
                 XCTAssertEqual(resolved, i, "Resolved dependency should match the registered value")
 
                 dispatchGroup.leave()
