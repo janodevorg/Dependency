@@ -16,15 +16,6 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
     steps:
       - uses: actions/checkout@v3
-      - name: Build iOS
+      - name: Test Swift Package
         run: |
-          set -o pipefail && xcodebuild test -scheme "Dependency" -destination "platform=macOS,arch=arm64" -skipPackagePluginValidation | xcbeautify
-      - name: Build macOS
-        run: |
-          set -o pipefail && xcodebuild test -scheme "Dependency" -destination "platform=macOS,arch=arm64" -skipPackagePluginValidation | xcbeautify
-      - name: Build macCatalyst
-        run: |
-          set -o pipefail && xcodebuild test -scheme "Dependency" -destination "platform=macOS,arch=arm64,variant=Mac Catalyst" -skipPackagePluginValidation | xcbeautify
-      - name: Build tvOS
-        run: |
-          set -o pipefail && xcodebuild test -scheme "Dependency" -destination "platform=tvOS Simulator,OS=16.4,name=Apple TV 4K (3rd generation)" -skipPackagePluginValidation | xcbeautify
+          swift test
