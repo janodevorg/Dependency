@@ -15,7 +15,7 @@ import os
  - If it is non optional it crashes with `preconditionFailure`.
  */
 @propertyWrapper
-public struct Dependency<T>
+public struct Dependency<T: Sendable>
 {
     /// Type to inject by this annotation.
     public var wrappedValue: T

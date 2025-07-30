@@ -8,7 +8,7 @@
  - ``Dependency/Factory/debugDescription``
 
  */
-public struct Factory<T>: CustomDebugStringConvertible {
+public struct Factory<T>: @unchecked Sendable, CustomDebugStringConvertible {
 
     /// Creates a new instance.
     /// Having the container as parameter let us query other instances.

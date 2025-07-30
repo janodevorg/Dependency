@@ -107,7 +107,7 @@ final class DependencyContainerTests: XCTestCase
 
 // MARK: Mocking a protocol
 
-private protocol HomeCoordinating {
+private protocol HomeCoordinating: Sendable {
     func start() -> String
 }
 

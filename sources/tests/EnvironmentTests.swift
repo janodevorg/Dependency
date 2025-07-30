@@ -23,7 +23,8 @@ final class EnvironmentTests: XCTestCase {
 
     func testDefaultRegistrationForTesting() {
         let object = DependencyContainer.RuntimeEnvironment.test.rawValue
-        DependencyContainer.register(object)
+        // Register in test environment explicitly since that's where we'll resolve from
+        DependencyContainer.register(object, environment: .test)
         XCTAssertEqual(DependencyContainer.RuntimeEnvironment.test.rawValue, DependencyContainer.resolve(.test) as String)
     }
 }

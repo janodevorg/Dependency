@@ -31,7 +31,7 @@ final class FactoryTests: XCTestCase
 
 // MARK: - Test objects
 
-private protocol HomeCoordinating {
+private protocol HomeCoordinating: Sendable {
     func start() -> String
 }
 

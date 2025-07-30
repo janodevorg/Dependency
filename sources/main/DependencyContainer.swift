@@ -4,9 +4,9 @@ import Foundation
 /**
  Dependency container.
  */
-public final class DependencyContainer: CustomDebugStringConvertible
+public final class DependencyContainer: @unchecked Sendable, CustomDebugStringConvertible
 {
-    public enum RuntimeEnvironment: String, Equatable {
+    public enum RuntimeEnvironment: String, Equatable, Sendable {
         case live
         case preview
         case test
@@ -41,18 +41,12 @@ public final class DependencyContainer: CustomDebugStringConvertible
     // Shared container instance
     private static let shared = DependencyContainer()
 
-    // Logger instance.
-    private static var log = Logger(subsystem: "Dependency", category: "DependencyContainer")
-    private static var isConfigured = false
-
+    // Thread-safe logger container
+    private static let logContainer = LoggerContainer()
+    
     public static func configureLogger(subsystem: String, category: String) {
         DependencyContainer.queue.async(flags: .barrier) {
-            guard !Self.isConfigured else {
-                Self.log.debug("Ignored call. Logger can only be configured once.")
-                return
-            }
-            Self.log = Logger(subsystem: subsystem, category: category)
-            Self.isConfigured = true
+            logContainer.configure(subsystem: subsystem, category: category)
         }
     }
 
@@ -86,7 +80,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter environment: environment where registration happens.
      - Returns: true if the dependency is registered.
      */
-    public static func isRegistered<T>(_ dependency: T.Type, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) -> Bool {
+    public static func isRegistered<T: Sendable>(_ dependency: T.Type, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) -> Bool {
         DependencyContainer.queue.sync {
             let key = key ?? keyForType(T.self, environment: environment)
             return shared.dependencies[key] != nil
@@ -103,7 +97,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter factory: An object that creates a new instance of type `T`.
      - Parameter environment: environment where registration happens.
     */
-    public static func register<T>(factory: Factory<T>, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) {
+    public static func register<T: Sendable>(factory: Factory<T>, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) {
         DependencyContainer.queue.async(flags: .barrier) {
             let key = key ?? keyForType(factory.typeCreated.self, environment: environment)
             shared.dependencies[key] = factory as AnyObject
@@ -118,7 +112,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
      - Parameter dependency: instance being registered.
      - Parameter environment: environment where registration happens.
      */
-    public static func register<T>(_ dependency: T, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) {
+    public static func register<T: Sendable>(_ dependency: T, key: String? = nil, environment: RuntimeEnvironment = RuntimeEnvironment()) {
         DependencyContainer.queue.async(flags: .barrier) {
             let key = key ?? keyForType(T.self, environment: environment)
             shared.dependencies[key] = dependency as AnyObject
@@ -142,7 +136,7 @@ public final class DependencyContainer: CustomDebugStringConvertible
 
      - Returns: resolved instance.
      */
-    public static func resolve<T>(key: String? = nil, _ environment: RuntimeEnvironment = RuntimeEnvironment()) -> T {
+    public static func resolve<T: Sendable>(key: String? = nil, _ environment: RuntimeEnvironment = RuntimeEnvironment()) -> T {
         DependencyContainer.queue.sync {
             let key = key ?? keyForType(T.self, environment: environment)
 
@@ -186,5 +180,34 @@ private protocol OptionalProtocol {
 extension Optional: OptionalProtocol {
     func wrappedType() -> Any.Type {
         Wrapped.self
+    }
+}
+
+private final class LoggerContainer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _log = Logger(subsystem: "Dependency", category: "DependencyContainer")
+    private var _isConfigured = false
+    
+    var log: Logger {
+        lock.lock()
+        defer { lock.unlock() }
+        return _log
+    }
+    
+    var isConfigured: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _isConfigured
+    }
+    
+    func configure(subsystem: String, category: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !_isConfigured else {
+            _log.debug("Ignored call. Logger can only be configured once.")
+            return
+        }
+        _log = Logger(subsystem: subsystem, category: category)
+        _isConfigured = true
     }
 }
